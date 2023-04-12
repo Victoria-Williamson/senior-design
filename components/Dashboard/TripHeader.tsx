@@ -1,74 +1,85 @@
-import ArrowBackIcon from "@mui/icons-material/ArrowBack"
-import EditIcon from "@mui/icons-material/Edit"
-import { Grid } from "@mui/material"
+import { ArrowBack, Edit, MoreHoriz } from "@mui/icons-material"
+import { Box, Button } from "@mui/material"
 import Typography from "@mui/material/Typography"
+import { useRouter } from "next/router"
+import React from "react"
 import Avatar from "../../components/Avatar"
+import { useScreen } from "../../utility/hooks/screen"
+import { useTrip } from "../../utility/hooks/trip"
+import { BackdropModal } from "../BackdropModal"
+import ModifyTrip from "../Modify/ModifyTrip"
 
-export const TripHeader = (props: any) => {
-  const item1 = { username: "username", id: "123", name: "noriyuki" }
-  const item2 = { username: "username2", id: "456", name: "minoru" }
-  const trip_details = {
-    location: "Orlando",
-    date_start: "October 1",
-    date_end: "October 3",
-    participants: [item1, item2],
-  }
+export function TripHeader({ showModify }: { showModify: () => void }) {
+  const router = useRouter()
+  const { trip } = useTrip()
+  const { updateNav } = useScreen()
 
-  return (
-    <div>
-      <Grid
-        container
+  React.useEffect(() => {
+    updateNav(
+      {
+        background:
+          "linear-gradient(99.17deg, rgba(162, 54, 3, 0.9) -3.2%, rgba(101, 46, 129, 0.9) 26.95%, rgba(75, 98, 147, 0.9) 60.14%, rgba(63, 61, 86, 0.9) 97.04%)",
+      },
+      "transparent",
+      <div
         style={{
-          padding: "20px",
+          height: "250px",
         }}
       >
-        <Grid
-          item
-          sx={{
-            display: "flex",
+        <Button onClick={() => router.back()}>
+          <ArrowBack sx={{ color: "white" }} />
+        </Button>
+        <div
+          style={{
+            padding: 20,
             flexDirection: "column",
-            alignItems: "left",
-            justifyContent: "start",
-            gap: 1,
-            paddingTop: "50px",
+            display: "flex",
+
+            alignContent: "center",
+            justifyContent: "center",
+            bottom: 0,
           }}
         >
-          <ArrowBackIcon sx={{ color: "white", fontSize: 40 }} />
-        </Grid>
+          <Box display={"flex"} flexDirection={"row"} gap={"3px"}>
+            <Typography sx={{ fontSize: "40px", fontWeight: "bold", color: "white" }}>
+              {trip.destination}
+            </Typography>
+            <Button variant="text" onClick={() => showModify()}>
+              <Edit sx={{ color: "white", fontSize: "20px" }} />
+            </Button>
+          </Box>
+          <div style={{ display: "flex", flexDirection: "row", gap: "10px" }}>
+            {Array.from(trip.attendees).map((attendee, index) => {
+              if (index <= 4)
+                return (
+                  <Avatar
+                    key={attendee}
+                    name={trip.userData?.get(attendee)?.name ?? "name"}
+                    size={50}
+                  />
+                )
+            })}
+            {trip.attendees !== undefined && trip.attendees.size !== 0 && (
+              <Button
+                sx={{ display: "flex", alignItems: "center", justifyContent: "start" }}
+                variant="text"
+                color="secondary"
+                onClick={() => {
+                  router.push(`/dashboard/trip/attendees?id=${trip.uid}`)
+                }}
+              >
+                <MoreHoriz />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>,
+    )
+  }, [trip])
 
-        <Grid
-          item
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 1,
-            alignItems: "left",
-            justifyContent: "start",
-            paddingLeft: "50px",
-          }}
-        >
-          <Typography sx={{ color: "white", fontWeight: "700", fontSize: "40px" }}>
-            {trip_details.location} <EditIcon sx={{ color: "white" }} />
-          </Typography>
-
-          <Typography sx={{ color: "white", fontWeight: "400", fontSize: "20px" }}>
-            {trip_details.date_start} - {trip_details.date_end}
-          </Typography>
-          <Grid
-            container
-            sx={{
-              display: "flex",
-              flexDirection: "row",
-              gap: 2,
-            }}
-          >
-            {trip_details.participants.map((item) => (
-              <Avatar key={item.id} name={item.username} />
-            ))}
-          </Grid>
-        </Grid>
-        {/* <img src="/header.svg" alt="header" layout={"fill"} objectFit={"cover"} /> */}
-      </Grid>
-    </div>
-  )
+  return <></>
+}
+const $popUpDiv: React.CSSProperties = {
+  position: "absolute",
+  zIndex: 5,
 }

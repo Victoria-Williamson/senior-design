@@ -1,9 +1,6 @@
 import React from "react"
 import Widget from "../../components/Widget"
 import { StoredLocation, WidgetType } from "../types/trip"
-import { useLocalStorage } from "react-use-storage"
-import { ConstructionOutlined } from "@mui/icons-material"
-import { send } from "process"
 
 type ResizableUseState = {
   size: Map<string, number> // stores the size of each item <key,size>
@@ -22,8 +19,11 @@ interface Resizable {
   createKey: (type: WidgetType, uid: string) => string
   getWidget: (key: string) => React.ReactNode
   onSortEnd: ({ oldIndex, newIndex }: { oldIndex: number; newIndex: number }) => void
+  onSortStart: () => void
   addItem: (key: string) => void
   getStorableLayout: (order: Array<string>) => void
+  moving: boolean
+  removeFromLayout: (key: string) => void
 }
 
 const ResizableContext = React.createContext<Resizable | null>(null)
@@ -47,8 +47,10 @@ export function ResizableProvider({ children }: { children: React.ReactNode }) {
     widgets: new Map<string, React.ReactNode>(),
   })
 
+  const [moving, setMoving] = React.useState(false)
+
   const DEFAULT_SIZE_INDEX = 1
-  const SIZES = [3, 5, 8, 12]
+  const SIZES = [1, 2, 3, 4]
 
   // Allows local layout to be stored whenever there are changes
   React.useEffect(() => {
@@ -99,6 +101,22 @@ export function ResizableProvider({ children }: { children: React.ReactNode }) {
     return `${type}:${uid}`
   }
 
+  function removeFromLayout(key: string) {
+    let size = new Map(resizable.size)
+    size.delete(key)
+
+    let order = new Set(resizable.order)
+    order.delete(key)
+
+    let widgets = new Map(resizable.widgets)
+    widgets.delete(key)
+
+    setResizable({
+      size: size,
+      order: Array.from(order),
+      widgets: widgets,
+    })
+  }
   /**
    * Handles reading the layout from the database.
    */
@@ -230,6 +248,11 @@ export function ResizableProvider({ children }: { children: React.ReactNode }) {
       ...resizable,
       order: moveArray(oldIndex, newIndex),
     })
+    setMoving(false)
+  }
+
+  function onSortStart() {
+    setMoving(true)
   }
 
   return (
@@ -242,12 +265,15 @@ export function ResizableProvider({ children }: { children: React.ReactNode }) {
         handleItemUpdate,
         readLayout,
         resizable,
+        onSortStart,
         onSortEnd,
         getWidget,
         addItem,
         canDecreaseSize,
         canIncreaseSize,
         getStorableLayout,
+        removeFromLayout,
+        moving,
       }}
     >
       {children}

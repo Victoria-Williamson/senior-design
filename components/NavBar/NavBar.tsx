@@ -1,6 +1,6 @@
-import { Person } from "@mui/icons-material"
 import AirportShuttleIcon from "@mui/icons-material/AirportShuttle"
 import MenuIcon from "@mui/icons-material/Menu"
+import { Dropdown, MenuProps, Button as AButton } from "antd"
 import {
   AppBar,
   Box,
@@ -18,24 +18,21 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material"
-import React from "react"
+import Router from "next/router"
 import theme from "../../styles/theme/Theme"
 import { useAuth } from "../../utility/hooks/authentication"
 import useNavBar from "../../utility/hooks/navbar"
 import { useScreen } from "../../utility/hooks/screen"
+import Avatar from "../Avatar"
 import LoggedOutDrawer from "./LoggedOutDrawer"
 import { NavBarButton } from "./NavButton"
 
-export default function NavBar({ path }: { path: string }) {
-  const landingTextColor = path === "/" ? "white" : ""
+export default function NavBar({ path, loggedIn }: { path: string; loggedIn: boolean }) {
   const landingBackgroundColor = path === "/" ? "#5F9DF7" : "#3F3D56"
   const { user, doLogout } = useAuth()
   const { loading } = useScreen()
-  const { updateErrorToast } = useScreen()
-  const [username, setUsername] = React.useState("")
 
-  const { handleListKeyDown, handleDrawerToggle, setOpen, anchorRef, open, mobileOpen } =
-    useNavBar()
+  const { handleDrawerToggle, setOpen, anchorRef, mobileOpen } = useNavBar()
 
   const { nav } = useScreen()
 
@@ -43,11 +40,26 @@ export default function NavBar({ path }: { path: string }) {
     doLogout()
   }
 
+  const handleSettings = (): void => {
+    Router.push("/settings/account")
+  }
+
   const drawer = (
     <Box onClick={handleDrawerToggle} sx={{ m: 2 }}>
       <LoggedOutDrawer user={user} />
     </Box>
   )
+
+  const items: MenuProps["items"] = [
+    {
+      key: "1",
+      label: <a onClick={() => handleSettings()}> my account </a>,
+    },
+    {
+      key: "2",
+      label: <a onClick={() => handleLogout()}> logout </a>,
+    },
+  ]
 
   return (
     <>
@@ -115,56 +127,29 @@ export default function NavBar({ path }: { path: string }) {
                 textAlign: "right",
               }}
             >
-              {user !== undefined && user?.didFinishRegister ? (
+              {loggedIn ? (
                 <>
-                  {/* TODO: add correct pages once they have been created */}
                   <NavBarButton path="/dashboard" text="dashboard" variant="text" />
-                  <NavBarButton path="/teams" text="teams" variant="text" />
+                  <NavBarButton path="/settings/friends" text="friends" variant="text" />
                   <div onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-                    <Button
-                      ref={anchorRef}
-                      color="secondary"
-                      variant="outlined"
-                      aria-label={"user"}
-                      aria-controls={open ? "composition-menu" : undefined}
-                      aria-expanded={open ? "true" : undefined}
-                      area-haspopup="true"
-                    >
-                      <Person sx={{ color: "white" }} />
-                    </Button>
-                    <Popper
-                      open={open}
-                      anchorEl={anchorRef.current}
-                      role={undefined}
-                      placement="bottom-start"
-                      transition
-                      disablePortal
-                    >
-                      {({ TransitionProps, placement }) => (
-                        <Grow
-                          {...TransitionProps}
-                          style={{
-                            transformOrigin:
-                              placement === "bottom-start" ? "left top" : "left bottom",
-                          }}
-                        >
-                          <Paper>
-                            <ClickAwayListener onClickAway={() => setOpen(false)}>
-                              <MenuList
-                                autoFocusItem={open}
-                                id="composition-menu"
-                                aria-labelledby="composition-button"
-                                onKeyDown={handleListKeyDown}
-                              >
-                                {/* TODO: Add logic for settings page*/}
-                                {/* <MenuItem onClick={handleMenuClose}>my account</MenuItem> */}
-                                <MenuItem onClick={(e) => handleLogout()}>logout</MenuItem>
-                              </MenuList>
-                            </ClickAwayListener>
-                          </Paper>
-                        </Grow>
-                      )}
-                    </Popper>
+                    {anchorRef !== null && anchorRef !== undefined && (
+                      <>
+                        <Dropdown menu={{ items }} placement="bottom">
+                          <AButton
+                            style={{
+                              backgroundColor: "transparent",
+                              height: "60px",
+                              border: "none",
+                            }}
+                          >
+                            <Avatar
+                              name={user?.name ?? ""}
+                              image={user?.profilePic.length !== 0 ? user?.profilePic : undefined}
+                            />
+                          </AButton>
+                        </Dropdown>
+                      </>
+                    )}
                   </div>
                 </>
               ) : (

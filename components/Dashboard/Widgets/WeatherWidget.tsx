@@ -1,21 +1,12 @@
-import CancelIcon from "@mui/icons-material/Cancel"
-import EditIcon from "@mui/icons-material/Edit"
-import {
-  CircularProgress,
-  Divider,
-  Grid,
-  IconButton,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material"
+import { CircularProgress, Divider, Grid, Paper, Stack, TextField, Typography } from "@mui/material"
 import Image from "next/image"
 import React from "react"
+import { useTrip } from "../../../utility/hooks/trip"
 import { CurrentData, ForecastData } from "../../../utility/types/weather"
 
 const WeatherWidget: React.FC = () => {
-  const [city, setCity] = React.useState("Bohol, Philippines") //TODO: Grab location from trip as default
+  const { trip } = useTrip()
+  const [city, setCity] = React.useState(trip.destination)
   const [metric, setMetric] = React.useState("imperial")
   const [loading, sLoading] = React.useState(false)
 
@@ -58,7 +49,6 @@ const WeatherWidget: React.FC = () => {
           sLoading(true)
           const forecastData = await fetchForecast(city, metric)
           const currentData = await fetchCurrentWeather(city, metric)
-
           if (
             forecastData === undefined ||
             currentData === undefined ||
@@ -88,24 +78,22 @@ const WeatherWidget: React.FC = () => {
     fetchWeather()
   }, [city, metric])
 
-  if (weatherWidget.current === undefined || weatherWidget.forecast === undefined) {
-    return <CircularProgress color="inherit" />
-  }
-
   return (
-    <div>
-      {weatherWidget && (
+    <div style={{ width: "100%", height: "300px", padding: "10px" }}>
+      {weatherWidget && weatherWidget.current && weatherWidget.forecast && (
         <div>
           <Paper
             square={false}
             style={{
               display: "inline-block",
               borderRadius: 5,
-              backgroundColor: "#E1E2DE",
+              width: "100%",
+              backgroundColor: "#white",
             }}
           >
             <Grid container direction="row" justifyContent="flex-end">
-              {state.inEditMode ? (
+              {/* TODO: Temporarily removing editing */}
+              {/* {state.inEditMode ? (
                 <IconButton
                   onClick={() =>
                     setState((val) => ({
@@ -129,7 +117,7 @@ const WeatherWidget: React.FC = () => {
                 >
                   <EditIcon style={$iconStyle} />
                 </IconButton>
-              )}
+              )} */}
             </Grid>
             <Divider orientation="horizontal" />
             <Grid container direction="row" justifyContent="space-evenly">

@@ -1,4 +1,5 @@
 import React from "react"
+import { createFetchRequestOptions } from "../fetch"
 import { Poll } from "../types/trip"
 import { useAuth } from "./authentication"
 import { useScreen } from "./screen"
@@ -15,6 +16,7 @@ export type usePollHook = {
   doesUserOwn: () => boolean
   didUserVote: (index: number) => boolean
   doVote: () => Promise<void>
+  poll: Poll
   showResults: () => boolean
   selectOption: (index: number) => void
   pollResults: (index: number) => number
@@ -58,7 +60,13 @@ export default function usePoll(p: Poll): usePollHook {
   }, [])
 
   function hasUserVoted() {
-    return poll.didSubmit
+    let didVote = poll.options.map((option) => {
+      if (option.voters.includes(user?.uid ?? "uid")) {
+        return true
+      }
+    })
+
+    return poll.didSubmit || didVote.includes(true)
   }
   /**
    * Checks to see if a user owns a poll
@@ -83,8 +91,14 @@ export default function usePoll(p: Poll): usePollHook {
       return
     }
     let vote = poll.vote
-    await fetch(`${API_URL}trip/${tripID}/polls/vote/${poll.uid}/${vote}`, { method: "PUT" }).then(
-      (response) => {
+    let options = createFetchRequestOptions(
+      JSON.stringify({
+        uid: user?.uid ?? "uid",
+      }),
+      "PUT",
+    )
+    await fetch(`${API_URL}trip/${tripID}/polls/vote/${poll.uid}/${vote}`, options).then(
+      async (response) => {
         if (response.ok) {
           let tOptions = Array.from(p.options)
           tOptions[vote].voters.push(userID)
@@ -132,6 +146,7 @@ export default function usePoll(p: Poll): usePollHook {
     didUserVote,
     doVote,
     selectOption,
+    poll,
     pollResults,
     showResults,
     hasUserVoted,

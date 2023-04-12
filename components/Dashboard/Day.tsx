@@ -1,6 +1,8 @@
-import { Typography, Box } from "@mui/material"
-import { join } from "path"
+import { Box, Button, Typography } from "@mui/material"
+import React from "react"
 import { Event as EventType } from "../../utility/types/trip"
+import { BackdropModal } from "../BackdropModal"
+import ModifyEvent from "../Modify/ModifyEvent"
 import Event from "./Event"
 import JoinableEvent from "./JoinableEvent"
 
@@ -8,15 +10,13 @@ export default function Day({
   day,
   events,
   joinableEvents,
-  weatherIcon,
-  temperature,
 }: {
   day: Date
   events: Array<EventType>
   joinableEvents: Array<EventType>
-  weatherIcon: React.ReactNode
-  temperature: number
 }) {
+  const [showModifyEvent, setShowModifyEvent] = React.useState<EventType | undefined>(undefined)
+
   return (
     <Box sx={{ padding: "10px" }}>
       {/* Day header that includes date, weather icon, and temperature*/}
@@ -32,8 +32,6 @@ export default function Day({
         <Typography sx={{ fontWeight: 900, fontSize: "40px" }}>
           {day.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
         </Typography>
-        {weatherIcon}
-        <Typography sx={{ fontWeight: 700, fontSize: "24px" }}>{temperature}</Typography>
       </Box>
 
       {/* List of events this user has joined in chronological order */}
@@ -59,8 +57,25 @@ export default function Day({
             No Events{" "}
           </Box>
         )}
+
+        <BackdropModal
+          isOpen={showModifyEvent !== undefined}
+          toggleShow={() => setShowModifyEvent(undefined)}
+        >
+          {showModifyEvent !== undefined && (
+            <ModifyEvent event={showModifyEvent} closeModal={() => setShowModifyEvent(undefined)} />
+          )}
+        </BackdropModal>
         {events.map((event, index) => {
-          return <Event key={index} event={event} />
+          return (
+            <>
+              <Button onClick={() => setShowModifyEvent(event)} style={{ width: "100%" }}>
+                <Event key={index} event={event} />
+              </Button>
+
+              <div style={$popUpDiv}></div>
+            </>
+          )
         })}
       </Box>
 
@@ -83,4 +98,9 @@ export default function Day({
       </Box>
     </Box>
   )
+}
+
+const $popUpDiv: React.CSSProperties = {
+  position: "absolute",
+  zIndex: 2,
 }

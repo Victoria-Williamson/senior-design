@@ -2,6 +2,7 @@ import React from "react"
 import { createAttendeesArray, getAttendeeOptionsArray } from "../../helper"
 import { CreatedEvent } from "../../types/trip"
 import { useAuth } from "../authentication"
+import { useFriend } from "../friends"
 import { useScreen } from "../screen"
 import { useTrip } from "../trip"
 import { AttendeeOption } from "./createTrip"
@@ -15,15 +16,37 @@ export default function useCreateEvent() {
     attendees: Array<AttendeeOption>
     attendeeOptions: Array<AttendeeOption>
   }
+
+  const { friendList, addFriendOptions } = useFriend()
+  const { trip } = useTrip()
   const EMPTY_EVENT: TCreateEvent = {
     title: "",
     attendees: [],
-    duration: { start: new Date(), end: new Date() },
+    duration: { start: trip.duration.start, end: trip.duration.start },
     location: "",
     description: "",
     attendeeOptions: [],
   }
   const [event, setEvent] = React.useState<TCreateEvent>(EMPTY_EVENT)
+  React.useEffect(() => {
+    let friends = addFriendOptions()
+    let updatedOptions = Array.from(event.attendeeOptions)
+
+    event.attendeeOptions.forEach((option) => {
+      if (friends.has(option.uid)) {
+        friends.delete(option.uid)
+      }
+    })
+
+    friends.forEach((friend) => {
+      updatedOptions.push(friend)
+    })
+
+    setEvent({
+      ...event,
+      attendeeOptions: updatedOptions,
+    })
+  }, [friendList])
 
   function updateLocation(location: string) {
     setEvent({

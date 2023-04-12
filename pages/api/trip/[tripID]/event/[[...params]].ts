@@ -1,6 +1,8 @@
 import { NextApiRequest, NextApiResponse } from "next"
 import { firebaseAuth, unpackArrayResponse } from "../../../../../utility/firebase"
 import firebaseAdmin from "../../../../../utility/firebaseAdmin"
+import { Duration } from "../../../../../utility/types/trip"
+import { rMerge } from "ranges-merge"
 
 /**
  * Handles all requests managing trip events
@@ -32,61 +34,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
       break
     }
-    /**
-     * GET /api/trip/{tripID}
-     * Gets all events in a user's itinerary and any events they are able to join as well.
-     */
-    case "GET": {
-      if (params !== undefined) {
-        res.status(500).send("Endpoint does not exist :(")
-        return
-      }
-
-      if (firebaseAuth.currentUser === null) {
-        res.status(400).send("User is not logged in")
-        return
-      }
-
-      const userID = firebaseAuth.currentUser.uid
-      let joinableEvents: Array<any> = []
-      let itineraryEvents: Array<any> = []
-
-      await firebaseAdmin
-        .firestore()
-        .collection(`Trips/${tripID}/events`)
-        .where("attendees", "array-contains", userID)
-        .orderBy("duration.start")
-        .get()
-        .then(async (value) => {
-          itineraryEvents = unpackArrayResponse(value.docs)
-
-          await firebaseAdmin
-            .firestore()
-            .collection(`Trips/${tripID}/events`)
-            .orderBy("attendees")
-            .where("attendees", "not-in", [[userID]])
-            .orderBy("duration.start")
-            .get()
-            .then(async (value) => {
-              joinableEvents = unpackArrayResponse(value.docs)
-
-              res.status(200).send({
-                joinable: joinableEvents ?? [],
-                itinerary: itineraryEvents ?? [],
-              })
-            })
-            .catch((e) => {
-              res.status(400).send("Could not find joinable events user is in.")
-              return
-            })
-        })
-        .catch((e) => {
-          res.status(400).send("Could not find events user is in.")
-          return
-        })
-
-      break
-    }
 
     /**
      * Handles multiple update functions for the trip such as: letting a user JOIN an event, LEAVE an event, or update other INFO about an event.
@@ -101,15 +48,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     case "PUT": {
       // Check to make sure the API follows the required structures and the user is logged in.
       if (
-        firebaseAuth.currentUser === null ||
         params === undefined ||
         params.length !== 2 ||
-        (!params[0] && params[0] !== "join" && params[0] !== "leave" && params[0] !== "info")
+        (!params[0] &&
+          params[0] !== "join" &&
+          params[0] !== "leave" &&
+          params[0] !== "info" &&
+          params[0] !== "reschedule")
       ) {
         res.status(400).send("Invalid Params")
       } else {
-        const purpose = params[0] // join | leave | info
+        const purpose = params[0] // join | leave | info | reschedule
         const eventId = params[1]
+
+        if (purpose === "reschedule") {
+          await doEventReschedule(req, res, eventId, tripID)
+          return
+        }
 
         // Prevent updating attendees by using the /api/trip/{tripID}/update/{eventID} endpoint. Must use .../leave/{eventID} or .../join/{eventID} to do this.
         if (purpose === "info" && req.body !== undefined && req.body.attendees !== undefined) {
@@ -122,18 +77,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Sets request to add the user to the array of attendees in firebase.
             case "join": {
               return {
-                attendees: firebaseAdmin.firestore.FieldValue.arrayUnion(
-                  firebaseAuth.currentUser?.uid,
-                ),
+                attendees: firebaseAdmin.firestore.FieldValue.arrayUnion(req.body.uid),
               }
             }
             // Sets the request to remove the user from the array of attendees in firebase.
             case "leave": {
               return {
-                attendees: firebaseAdmin.firestore.FieldValue.arrayRemove(
-                  firebaseAuth.currentUser?.uid,
-                ),
+                attendees: firebaseAdmin.firestore.FieldValue.arrayRemove(req.body.uid),
               }
+            }
+            // Given the new start and end date in the request body
+            case "reschedule": {
+              return { duration: { start: req.body.duration.start, end: req.body.duration.end } }
             }
             // Sets the request to update information about the event.
             case "info": {
@@ -152,6 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             res.status(200).send({})
           })
           .catch((e) => {
+            console.log(e)
             res.status(400).send("Could not modify event.")
           })
       }
@@ -180,5 +136,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           })
       }
     }
+  }
+}
+
+async function doEventReschedule(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  eventID: string,
+  tripID: string,
+) {
+  const { duration, attendees }: { duration: Duration; attendees: Array<string> } = req.body
+  try {
+    let findAttendeeEvents = await firebaseAdmin
+      .firestore()
+      .collection(`Trips/${tripID}/events/`)
+      .where("attendees", "array-contains-any", attendees)
+      .get()
+
+    let attendeeEvents = unpackArrayResponse(findAttendeeEvents.docs)
+
+    let eventIntervals: Array<Array<number>> = [
+      [new Date(duration.start).getTime(), new Date(duration.end).getTime()],
+    ]
+
+    attendeeEvents.forEach((event) => {
+      if (event.uid !== eventID)
+        eventIntervals.push([
+          new Date(event.duration.start).getTime(),
+          new Date(event.duration.end).getTime(),
+        ])
+    })
+
+    // If the event can can be rescheduled at the time, then when merging in the time range w/ other events no overlap should occur so the length should stay the same.
+    const PRE_MERGE_LENGTH = eventIntervals.length
+    const MERGED_LENGTH = rMerge(eventIntervals as any)?.length ?? 0
+
+    if (PRE_MERGE_LENGTH !== MERGED_LENGTH) {
+      res.status(400).send("Conflict found. Can't reschedule.")
+    } else {
+      firebaseAdmin
+        .firestore()
+        .collection(`Trips/${tripID}/events`)
+        .doc(eventID)
+        .update({ duration: duration })
+        .then(() => {
+          res.status(200).send({})
+        })
+    }
+  } catch (e) {
+    res.status(400).send("Cannot find reschedule event.")
   }
 }
